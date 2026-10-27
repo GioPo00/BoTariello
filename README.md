@@ -1,8 +1,9 @@
 # Price list and gallery catalogue
 
-This repository contains no data. It contains two scheduled jobs that publish
-two JSON files, rebuilt from scratch on a fixed cadence and meant to be read
-straight into memory by a consumer.
+This repository contains two scheduled jobs. They publish JSON files, rebuilt
+from scratch on a fixed cadence and meant to be read straight into memory by a
+consumer. The scripts live on `main`; the published files live on their own
+branches, one per kind of output.
 
 | branch | file | rebuilt |
 |---|---|---|
