@@ -1,20 +1,17 @@
-# IL LAVORO CHE AGGIORNA IL CATALOGO DELLA GALLERY
+# THE JOB THAT REBUILDS THE GALLERY CATALOGUE
 #
-# CHIESTO l'11/10/2026: gli album devono aggiornarsi da soli. Ogni 3 ore
-# rilegge da fut.gg tutti gli album (nuovi album, requisiti, gradi,
-# rarita') e pubblica `catalogo-fc27.json` sul ramo `galleria`. FUTMAGO lo
-# scarica all'avvio; se manca o non e' sano, usa quello che porta con se'.
+# Every 3 hours it re-reads the full album catalogue from the source and
+# publishes `catalogo-fc27.json` on the `galleria` branch.
 #
-# Ramo a parte perche' `dati` viene rifatto da zero ogni quarto d'ora dal
-# lavoro del listino.
+# A branch of its own, because `dati` is rebuilt from scratch every quarter
+# of an hour by the price list job.
 
 name: galleria
 
 on:
   schedule:
-    # Ogni 3 ore, ai :20, lontano dal quarto d'ora del listino. Era una volta
-    # al giorno: il 22/10/2026 Season 2 ha portato MLS, NWSL e ROSHN e fut.gg
-    # li ha pubblicati dopo il giro del mattino.
+    # Every 3 hours, at :20, well away from the quarter hour of the price
+    # list job.
     - cron: '20 */3 * * *'
   workflow_dispatch:
 
@@ -35,24 +32,24 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Legge tutti gli album da fut.gg
+      - name: Read every album from the source
         run: node tools/gallery/scarica.mjs
 
-      - name: Compone il catalogo
+      - name: Build the catalogue
         run: |
           mkdir -p galleria
           node tools/gallery/genera.mjs --json galleria/catalogo-fc27.json
 
-      - name: Controlla che sia sano
+      - name: Check that it is sound
         run: node tools/gallery/controlla-catalogo.mjs galleria/catalogo-fc27.json
 
-      - name: Pubblica sul ramo galleria
+      - name: Publish on the galleria branch
         run: |
           set -e
           cd galleria
           git init -q
           git config user.name  "galleria"
-          git config user.email "galleria@ilmagodifut.com"
+          git config user.email "galleria@users.noreply.github.com"
           git add -A
           git commit -q -m "catalogo $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push -q --force \

@@ -1,7 +1,7 @@
 /*
- * Il catalogo si pubblica solo se e' sano: altrimenti FUTMAGO continua con
- * quello del giorno prima. Una pagina di fut.gg cambiata non deve diventare
- * una Gallery vuota per tutti.
+ * The catalogue is published only if it is sound: otherwise the previous one
+ * stays in place. A changed source page must not turn into an empty Gallery
+ * for everybody.
  */
 import { readFileSync } from 'node:fs';
 

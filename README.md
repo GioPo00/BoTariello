@@ -1,101 +1,119 @@
-# BoTariello — il listino dei prezzi
+# Price list and gallery catalogue
 
-Questo repository **non contiene il prodotto**: contiene un **lavoro
-programmato** che ogni quarto d'ora rigenera il listino dei prezzi e lo
-pubblica su due rami.
+This repository contains no data. It contains two scheduled jobs that publish
+two JSON files, rebuilt from scratch on a fixed cadence and meant to be read
+straight into memory by a consumer.
 
-    ramo dati      ->  listino-console.json, listino-pc.json, stato.json
-    ramo galleria  ->  catalogo-fc27.json
+| branch | file | rebuilt |
+|---|---|---|
+| `dati` | `listino-console.json` | every 15 minutes |
+| `dati` | `listino-pc.json` | every 15 minutes |
+| `dati` | `stato.json` | every 15 minutes |
+| `galleria` | `catalogo-fc27.json` | every 3 hours |
 
-L'estensione li legge da qui:
+Consumers read them straight from `raw.githubusercontent.com`, with no API key
+and no rate limit of their own.
 
-    https://raw.githubusercontent.com/GioPo00/BoTariello/dati/listino-console.json
-    https://raw.githubusercontent.com/GioPo00/BoTariello/galleria/catalogo-fc27.json
+## The price list
 
-## Perché esiste
+The source publishes its data in bulk, split across several files, each one
+identified by the fingerprint of its content. This job reads the manifest,
+downloads the three files it needs and merges them into one compact file per
+platform:
 
-Il listino lo serviva una funzione del sito, che scaricava da `fut.gg`.
-Ha smesso di funzionare: `fut.gg` non risponde più ai server. Misurato il
-20/09/2026, stessa ora, stessi indirizzi:
+    { "v": 2, "id0": 27, "d": [...], "p": [...], "n": [...], "quando": "..." }
 
-| da dove | esito |
+| field | meaning |
 |---|---|
-| un computer qualunque | 200 |
-| il server dei bot | 200 |
-| la funzione Netlify del sito | 502 |
-| il Worker Cloudflare | 403 |
+| `id0` | the identifier of the first card |
+| `d` | the identifiers, stored as **differences** between consecutive values |
+| `p` | one price per card, in the same order as `d` |
+| `n` | the identifiers of the cards that are not on the market |
+| `quando` | when this file was generated (ISO 8601) |
 
-Serviva quindi una macchina che `fut.gg` accetti e che giri da sola. In più,
-da quando il sito è a crediti, ogni pubblicazione su Netlify ne costa 15:
-qui non si tocca il sito e non si spende niente.
+Two details that matter to a reader:
 
-## Come funziona
+- **`p[i] === 0` means "no price", never "free".** It has to be discarded.
+- **`n` is a set of exceptions, not a list to act on.** A card is in it when the
+  source gives it a state other than 0: a squad building challenge (the price
+  is the cost of the challenge), an objective or a reward. A reader that does
+  not know the field can ignore it safely.
 
-`costruisci-listino.mjs` legge il manifesto dei prezzi, scarica i tre pezzi
-che servono e ne fa **un file per piattaforma**, nella forma che l'estensione
-sa già leggere:
+The identifiers are stored as differences because that is what keeps the file
+small: about 130 KB per platform for twenty thousand cards.
 
-    { "v": 2, "id0": 27, "d": [ …differenze fra un id e il successivo… ], "p": [ …prezzi… ], "n": [ …fuori mercato… ] }
+### Which price wins
 
-* `d` sono **differenze**, non identificativi: 19.870 carte stanno in qualche
-  migliaio di numeri. Il file pesa ~128 KB.
-* `p` è in parallelo a `d`: la voce *i* di `p` è il prezzo della carta il cui
-  id si ricostruisce sommando le differenze.
-* Uno **zero** in `p` vuol dire "nessun prezzo", non "gratis": chi legge lo
-  scarta.
-* `n` elenca le carte che il mercato non vende (stato diverso da 0).
-* I prezzi buoni sono quelli del file `-dyn`: misurato il 20/09/2026, 1.722
-  carte su 19.870 avevano un prezzo diverso fra `-dyn` e file fermo. Dove il
-  `-dyn` non ha un numero si usa il file fermo, e dove non c'è nessuno dei due
-  la carta resta senza prezzo — mai a zero.
+The source publishes two files per platform: a settled one and a `-dyn` one
+that keeps moving. The dynamic one is the good one — measured on 2026-09-20,
+1.722 cards out of 19.870 had a different price there. Where the dynamic file
+has no number the settled one is used, and where neither has one the card is
+left at zero.
 
-### Il ciclo da 22 giri
+### How fresh is it
 
-Il `cron` di GitHub «ogni 15 minuti» in realtà parte **ogni 3-6 ore** (misurato
-il 16/10/2026: 04:32, 09:32, 14:44, 18:58). Perciò **una sola esecuzione resta
-accesa quasi sei ore** (il massimo di GitHub) e dentro rigenera il listino ogni
-quarto d'ora da sola:
+The list is rebuilt every quarter of an hour. Measured over a ten minute
+window, **31% of the prices change** — the cheapest listing of a card is sold
+and the next one costs several times more. Consumers that need a live price
+for a handful of cards should ask the market directly; this file is the bulk
+view.
 
-    while [ $giro -lt 22 ]; do        # 22 giri da 15 minuti = 5h30
-      node costruisci-listino.mjs listino
-      git push --force HEAD:dati      # il ramo viene riscritto: il repo non cresce
-      sleep fino alla prossima mezz'ora
-    done
+`quando` tells the consumer how old the file is, and it is the only way to
+tell a fresh list from a stale one.
 
-Quando l'esecuzione finisce o viene uccisa, l'ultimo passo **rilancia il
-lavoro** (`gh workflow run`), così il ciclo non si interrompe mai.
+## The gallery catalogue
 
-Il repository è pubblico, quindi i minuti non costano niente.
+`tools/gallery/` reads the full album catalogue from the source and publishes
+it as JSON: one entry per album, with the required cards, the five thresholds
+and the five rewards.
 
-### Il catalogo della Gallery
+The source is not the game: the game does not publish the collection, and the
+web app only knows two fields of it. The source pages carry the game's club
+identifier in the image address, which is the only way to tie the catalogue to
+the teams the game declares.
 
-`galleria.yml` gira ogni 3 ore (alle `:20`, lontano dal quarto d'ora) e rilegge
-da `fut.gg` gli album — nuovi album, requisiti, gradi, rarità — pubblicando
-`catalogo-fc27.json` sul ramo `galleria`. Le soglie non cambiano durante
-l'anno, quindi non serve rifarlo ogni 15 minuti.
+The thresholds are fixed for a year, so they are downloaded once, checked, and
+kept as plain data instead of being fetched on every use.
 
-## Configurazione necessaria
+## Layout
 
-Il repository dev'essere **pubblico**: su un repository privato il piano Free
-dà 2.000 minuti di Actions al mese, mentre il ciclo ne consuma ~21.900
-(~720 al giorno) e si esaurirebbe in tre giorni.
+    costruisci-listino.mjs              builds the price list
+    .github/workflows/listino.yml        the job that rebuilds it every 15 minutes
+    .github/workflows/galleria.yml       the job that rebuilds the catalogue
+    tools/gallery/scarica.mjs            reads every album from the source
+    tools/gallery/genera.mjs             turns the download into the catalogue
+    tools/gallery/controlla-catalogo.mjs checks the catalogue before publishing
+    tools/gallery/gemelle.json           hand measured pairs of men's and women's cards
 
-E in `Settings → Actions → General → Workflow permissions` va messo
-**«Read and write permissions»**, altrimenti il `git push` del workflow
-fallisce.
+## Running it by hand
 
-## I file
+    node costruisci-listino.mjs listino      # writes listino-console.json, listino-pc.json, stato.json
+    node tools/gallery/scarica.mjs            # writes tools/gallery/gallery-fc27.json
+    node tools/gallery/genera.mjs --json out.json
 
-    costruisci-listino.mjs              produce il listino
-    .github/workflows/listino.yml       il lavoro che rigenera ogni 15 minuti
-    .github/workflows/galleria.yml      il lavoro che aggiorna gli album
-    tools/gallery/scarica.mjs           legge gli album da fut.gg
-    tools/gallery/genera.mjs            compone il catalogo
-    tools/gallery/controlla-catalogo.mjs  lo verifica prima di pubblicare
+Node 22 or later. No dependencies.
 
-## Nota
+## The two jobs
 
-I prezzi vengono da `r2.fut.gg`, che è la fonte in blocco dei prezzi di
-fut.gg: è roba di terzi e si legge senza permessi. Questo repository non
-aggiunge niente ai prezzi: li raccoglie, li compatta e li pubblica ogni 15
-minuti.
+Both are plain GitHub Actions workflows, and both can be started by hand from
+the Actions tab.
+
+`listino` keeps a single run alive for almost six hours — GitHub's maximum —
+and rebuilds the list on its own every quarter of an hour. GitHub's own
+"every 15 minutes" cron does not fire every 15 minutes: it fires when it can,
+i.e. every 3 to 6 hours. When the job ends, is killed or is cancelled it
+starts another one, so the list never goes stale for long.
+
+Both branches are **rewritten** on every run: one commit, always the same size.
+Keeping the history would mean growing the repository by tens of megabytes a
+day, forever, for a history nobody reads.
+
+The repository must stay **public**: on the free plan a private repository
+gets 2.000 Actions minutes a month, and the price list job alone uses about
+21.900. There is nothing to protect in here — only published JSON and a script
+that reads public data.
+
+## Credits
+
+The prices and the album catalogue come from
+[fut.gg](https://www.fut.gg), which publishes them in bulk.

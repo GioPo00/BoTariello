@@ -1,11 +1,12 @@
 /**
- * Dal JSON scaricato al modulo TypeScript che FUTMAGO imbarca.
+ * From the downloaded JSON to the generated module.
  *
- * Due passi separati apposta: scaricare tocca la rete e puo' andare storto,
- * generare no. Cosi' si puo' rigenerare il codice da un catalogo gia' letto
- * senza rifare centoventisei richieste a fut.gg.
+ * Two separate steps on purpose: downloading touches the network and can go
+ * wrong, generating does not. That way the code can be regenerated from an
+ * already fetched catalogue without repeating the hundred and twenty six
+ * requests to the source.
  *
- * Uso:  node tools/gallery/genera.mjs
+ * Usage:  node tools/gallery/genera.mjs
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -29,9 +30,8 @@ function protetto(testo) {
 }
 
 /*
- * Album che FUTMAGO non mostra. POTM: DECISO dall'utente l'11/10/2026, «sono
- * tutti SBC, puoi anche non metterlo» — e su fut.gg non ha nemmeno il numero
- * di carte richieste.
+ * Albums that are left out. POTM: they are all squad building challenges, and
+ * the source does not even carry a number of required cards for them.
  */
 const ESCLUSI = new Set(['/fut-gallery/rarities/potm/']);
 
@@ -48,9 +48,9 @@ const gemelle = JSON.parse(readFileSync('tools/gallery/gemelle.json', 'utf8'));
  * SEGNALATO dall'utente il 26/09/2026: nell'album del Real Madrid mancavano le
  * carte della squadra femminile. Succedeva su trentotto album su centoventisei.
  *
- * In EA la squadra femminile di un club e' un club a se': il Chelsea maschile
- * e' il 5, quello femminile il 116010. Sulle pagine di fut.gg invece il
- * distintivo in cima e' uno solo — e l'album li accetta tutti e due.
+ * In the game the women's team of a club is a club of its own: the men's
+ * Chelsea is 5, the women's one is 116010. On the source pages instead there
+ * is a single badge at the top — and the album accepts both of them.
  *
  * Gli identificativi delle coppie li dice `gemelle.json`, misurato chiedendo
  * le carte a EA una squadra per volta.
@@ -113,10 +113,10 @@ const senzaCoppia = [];
 /*
  * ── LA LEGA DEGLI SCAFFALI NUOVI ──────────────────────────────────────────
  *
- * SEGNALATO il 22/10/2026: gli scaffali MLS, ROSHN e NWSL senza logo. Il
- * logo di uno scaffale che FUTMAGO non conosce viene dalla lega dei suoi
- * album, e un album di club la lega non ce l'ha. Gliela si da' qui: l'album
- * di club cerca le carte per club, la lega non cambia cosa contiene.
+ * The MLS, ROSHN and NWSL shelves carry no badge of their own. The badge of
+ * a shelf that is not known comes from the league of its albums, and a club
+ * album has no league. It is given here: a club album looks for its cards by
+ * club, the league does not change what it contains.
  */
 const LEGA_DELLO_SCAFFALE = {
   '/fut-gallery/mls/': 39,
@@ -132,10 +132,10 @@ function clubDelSet(set) {
   /*
    * ── PRIMA DI TUTTO, IL REQUISITO DI EA ─────────────────────────────────
    *
-   * SEGNALATO il 13/10/2026: il West Ham accetta solo la squadra femminile, e
-   * FUTMAGO proponeva anche i maschili. Il requisito lo scrive (`genere`, da
-   * `scarica.mjs`): «Women's», «Mens» o «Mens or Womens». Quando c'e' decide
-   * lui; le leghe qui sotto restano solo per una pagina che non lo dicesse.
+   * The West Ham album accepts only the women's team, while the proposed
+   * lineup also listed the men's cards. The requirement says it (`genere`, from
+   * `scarica.mjs`): «Women's», «Mens» or «Mens or Womens». When it is there it
+   * decides; the leagues below are only for a page that does not say it.
    */
   const maschileDi = (id) => gemelle.femminileVersoMaschile[String(id)] ?? id;
   const femminileDi = (id) => {
@@ -212,11 +212,9 @@ const righe = catalogo.map((set) => {
 /*
  * ── ANCHE COME DATI, PER IL LAVORO DI OGNI GIORNO ─────────────────────────
  *
- * CHIESTO l'11/10/2026: il catalogo che si aggiorna da solo.
- * `node genera.mjs --json <file>` scrive le stesse voci come JSON, che il
- * lavoro su GitHub pubblica e FUTMAGO scarica all'avvio (vedi
- * `caricaCatalogoGalleria` in `gallery-ea.ts`). Senza `--json` si scrive il
- * modulo TypeScript che FUTMAGO imbarca, come sempre.
+ * `node genera.mjs --json <file>` writes the same entries as JSON, which
+ * the scheduled job publishes and a consumer downloads at startup. Without
+ * `--json` the TypeScript module is written instead.
  */
 const comeDati = process.argv.indexOf('--json');
 if (comeDati >= 0) {

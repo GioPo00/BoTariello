@@ -1,37 +1,43 @@
 /*
- * IL LISTINO PREZZI, RIGENERATO DA UN LAVORO PROGRAMMATO.
+ * THE PRICE LIST, REBUILT BY A SCHEDULED JOB.
  *
- * ── PERCHE' NON LO SCARICA PIU' IL SITO ─────────────────────────────────────
+ * ── WHAT IT DOES ───────────────────────────────────────────────────────────
  *
- * Perche' fut.gg non risponde piu' ai server. MISURATO il 20/09/2026, stessa
- * ora, stessi indirizzi:
+ * It reads the source's manifest, downloads the three files that are needed
+ * and merges them into ONE file per platform, in a compact form that a
+ * consumer can read straight into memory:
  *
- *     dal PC di casa          200
- *     dal server Oracle       200
- *     dalla funzione Netlify  502  «manifesto-non-disponibile»
- *     dal Worker Cloudflare   403
+ *     { v, id0, d, p, n, quando }
  *
- * La funzione del sito faceva da ponte e ha smesso di funzionare. Serve una
- * macchina che fut.gg accetti, che giri da sola, e che depositi il risultato
- * dove FUTMAGO possa leggerlo senza chiedere permesso a nessuno.
+ *     player-prices-index       the identifiers, stored as differences
+ *     player-prices-<platform>  the settled prices
+ *     player-prices-<platform>-dyn  the prices that keep moving
  *
- * ── COSA FA ────────────────────────────────────────────────────────────────
+ * The `-dyn` files carry the good prices: measured on 2026-09-20, 1.722 out of
+ * 19.870 cards had a different price there than in the settled file. Where the
+ * `-dyn` has no number the settled one is used, and where neither has one the
+ * card is left without a price — never at zero, which a consumer would read as
+ * "free".
  *
- * Legge il manifesto di fut.gg, scarica i tre pezzi che servono e ne fa UN
- * file per piattaforma, nella forma che `leggiListinoInBlocco` gia' sa
- * leggere: `{ v, id0, d, p }`.
+ * ── WHY A SCHEDULED JOB AND NOT A DIRECT FETCH ─────────────────────────────
  *
- *     player-prices-index      gli identificativi, come differenze
- *     player-prices-<piatt>    i prezzi «fermi»
- *     player-prices-<piatt>-dyn i prezzi aggiornati di continuo
+ * The source does not answer requests coming from server IPs. Measured on
+ * 2026-09-20, same moment, same addresses:
  *
- * I prezzi buoni sono quelli del `-dyn`: MISURATO il 20/09/2026, 1.722 su
- * 19.870 erano diversi da quelli fermi. Dove il `-dyn` non ha un numero si
- * usa il file fermo, e dove non ce l'ha nessuno dei due la carta resta senza
- * prezzo — mai a zero, che il risolutore leggerebbe come «gratis».
+ *     from a home computer         200
+ *     from a server                 200
+ *     from an edge function         502
+ *     from a worker                 403
  *
- * E' lo stesso giro che fa Paletools: VERIFICATO leggendo la sua versione per
- * FC 27, la 27.0.7. Non e' un caso — e' l'unica fonte in blocco che esista.
+ * So the job runs on a runner the source accepts, keeps running by itself,
+ * and deposits the result where a consumer can read it without asking anybody
+ * for permission.
+ *
+ * ── WHY A COMPACT FORM ─────────────────────────────────────────────────────
+ *
+ * The identifiers are stored as differences between consecutive values: the
+ * index holds a few thousand numbers instead of twenty thousand, and the file
+ * stays around 130 KB per platform.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -60,12 +66,12 @@ function numeri(v) {
 }
 
 /**
- * Mette insieme identificativi e prezzi.
+ * Puts identifiers and prices together.
  *
- * L'indice e i prezzi sono due liste parallele: la voce `i` dell'una e la
- * voce `i` dell'altra sono la stessa carta. Se le lunghezze non tornano non si
- * indovina: si taglia alla piu' corta, perche' un disallineamento vorrebbe
- * dire prezzi veri sotto carte sbagliate.
+ * The index and the prices are two parallel lists: entry `i` of one and
+ * entry `i` of the other are the same card. If the lengths do not match
+ * nothing is guessed: the shorter one wins, because a misalignment would
+ * mean real prices under the wrong cards.
  */
 function unisci(indice, dinamici, fermi, stati) {
   const differenze = numeri(indice['d']);
@@ -78,12 +84,11 @@ function unisci(indice, dinamici, fermi, stati) {
   let usatiFermi = 0;
   let senzaPrezzo = 0;
   /*
-   * LE CARTE CHE IL MERCATO NON VENDE. SEGNALATO l'11/10/2026: FUTMAGO
-   * proponeva di comprare Frattesi SBC a 40k, Kaptein obiettivi, le Elvedi
-   * FUT Champions. fut.gg da' a ogni carta uno stato (`s`): 0 e' il mercato;
-   * 1 le SBC, col costo della sfida al posto del prezzo; 2 e 3 obiettivi e
-   * premi, senza prezzo. Si pubblicano gli identificativi con stato diverso
-   * da 0 in `n`: chi non lo conosce lo ignora.
+   * CARDS THE MARKET DOES NOT SELL. The source gives every card a state
+   * (`s`): 0 is the market; 1 is a squad building challenge, carrying the
+   * cost of the challenge instead of a price; 2 and 3 are objectives and
+   * rewards, with no price at all. The identifiers whose state is not 0 are
+   * published in `n`: a consumer that does not know the field ignores them.
    */
   const fuoriMercato = [];
   let identificativo = Number(indice['id0']);
@@ -102,7 +107,7 @@ function unisci(indice, dinamici, fermi, stati) {
       prezzi.push(f);
       usatiFermi++;
     } else {
-      /* Zero vuol dire «nessun prezzo», e il lettore lo scarta. */
+      /* Zero means "no price", and the consumer discards it. */
       prezzi.push(0);
       senzaPrezzo++;
     }
@@ -133,14 +138,14 @@ for (const [nome, chiave] of Object.entries(PIATTAFORME)) {
   try {
     dinamici = await prendi(indirizzo(manifesto, `${chiave}-dyn`));
   } catch (errore) {
-    /* Senza i dinamici si pubblica lo stesso, con i prezzi fermi. */
+    /* Without the dynamic file the same is published, with the settled prices. */
     console.log(`  ${nome}: niente -dyn (${errore.message})`);
   }
   const stati = numeri(fermi['s']).length > 0 ? fermi['s'] : dinamici['s'];
   const { documento, conti } = unisci(indice, dinamici['p'], fermi['p'], stati);
-  /* Il listino porta con se' l'istante in cui e' stato generato: e' l'unico
-     modo che ha il client di sapere quanto sono vecchi i prezzi che sta
-     usando. I parser gia' esistenti ignorano i campi in piu'. */
+  /* The price list carries the moment it was generated: it is the only way a
+     consumer can know how old the prices it is using are. Existing readers
+     ignore the extra field. */
   documento.quando = quando;
   writeFileSync(path.join(destinazione, `listino-${nome}.json`), JSON.stringify(documento));
   riepilogo.piattaforme[nome] = conti;

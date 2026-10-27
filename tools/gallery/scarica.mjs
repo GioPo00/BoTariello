@@ -1,33 +1,34 @@
 /**
- * IL CATALOGO DELLA GALLERY DI FC 27, PRESO DA FUT.GG.
+ * THE GALLERY CATALOGUE FOR FC 27, READ FROM THE SOURCE.
  *
- * ── PERCHE' NON DA EA ──────────────────────────────────────────────────────
+ * ── WHY NOT FROM THE GAME ──────────────────────────────────────────────────
  *
- * Perche' EA non lo da'. CERCATO il 21/09/2026 sulla Web App vera:
- * `AssetLocationUtils` ha cinquantuno funzioni, una per ogni file che il
- * client usa — rarita', squadre, ricerca giocatori, cosmetici — e nessuna per
- * la collezione. In `config/companion/` i nomi plausibili danno 404.
- * `services.Showcase` esiste ma ha un metodo solo, e non serve dati.
+ * Because the game does not publish it. Looked for on 2026-09-20 in the real
+ * web app: `AssetLocationUtils` has fifty one functions, one for every file
+ * the client uses — rarities, squads, player search, cosmetics — and none for
+ * the collection. In `config/companion/` every plausible name gives a 404.
+ * `services.Showcase` exists but has a single method and serves no data.
  *
- * La Gallery e' roba del gioco su console: la Web App ne conosce solo i due
- * campi che FUTMAGO gia' usa, `isCollected` e `gradingScore`.
+ * The Gallery is a console side feature: the web app only knows the two
+ * fields a consumer needs, `isCollected` and `gradingScore`.
  *
- * ── PERCHE' FUT.GG ─────────────────────────────────────────────────────────
+ * ── WHY THE SOURCE ─────────────────────────────────────────────────────────
  *
- * Perche' e' gia' la nostra fonte per i prezzi, e perche' pubblica il
- * catalogo per intero: centoventisei set, per ognuno le carte richieste, le
- * cinque soglie e i cinque premi. E perche' ogni pagina porta l'identificativo
- * EA del club nell'indirizzo dell'immagine — `2027/club/88` — che e' l'unico
- * modo di legare il loro catalogo alle squadre che la Web App dichiara.
+ * Because it is already the source used for the prices, and because it
+ * publishes the whole catalogue: one hundred and twenty six sets, each with
+ * its required cards, its five thresholds and its five rewards. And because
+ * every page carries the game's club identifier in the image address —
+ * `2027/club/88` — which is the only way to tie their catalogue to the teams
+ * the web app declares.
  *
- * ── PERCHE' UN FILE E NON UNA CHIAMATA ─────────────────────────────────────
+ * ── WHY A FILE AND NOT A CALL ───────────────────────────────────────────────
  *
- * Perche' queste soglie non cambiano: sono i traguardi di un anno di gioco.
- * Scaricarle a ogni apertura sarebbe una dipendenza da un sito che puo'
- * cadere, per un dato che e' fermo. Si scarica qui, si controlla, e diventa
- * codice nostro.
+ * Because these thresholds do not change: they are the goals of a year of
+ * play. Fetching them on every open would be a dependency on a site that can
+ * go down, for data that is fixed. It is downloaded here, checked, and becomes
+ * plain data.
  *
- * Uso:  node tools/gallery/scarica.mjs
+ * Usage:  node tools/gallery/scarica.mjs
  */
 import { writeFile } from 'node:fs/promises';
 
@@ -138,8 +139,8 @@ function leggiSet(htmlIntero, percorso, categoria) {
   /*
    * Gli album di club scrivono «Requires 15 players»; quelli di rarita'
    * «Requires Heroes players to complete», senza numero. TROVATO l'11/10/2026:
-   * Olografiche, Heroes, TOTW e Season 1 risultavano a 0, e FUTMAGO contava
-   * tutte le carte invece della formazione (5, 5, 20, 10). Il numero c'e'
+   * Olografiche, Heroes, TOTW and Season 1 came out as 0, while the real
+   * count is the lineup (5, 5, 20, 10). The number is
    * comunque nel riquadro della formazione: «0 / 5 players done».
    */
   const richieste = Number(
@@ -213,20 +214,20 @@ function leggiSet(htmlIntero, percorso, categoria) {
   /*
    * ── LE RARITA' DELL'ALBUM, DAL SUO REQUISITO ──────────────────────────────
    *
-   * SEGNALATO l'11/10/2026: Season 1 conteneva solo Destined for Glory. Le
-   * rarita' degli album di rarita' erano un elenco scritto a mano dentro
-   * FUTMAGO, e le Ones to Watch e le Future Stars non c'erano mai state messe.
-   * La pagina invece lo dice: «Requires Ones to Watch, Destined for Glory or
-   * Future Stars Player Items to complete». I nomi si traducono negli
-   * identificativi EA con le rarita' del file dati di fut.gg (`rarita`).
+   * Season 1 contained only Destined for Glory. The rarities of the rarity
+   * albums used to be a hand written list, and Ones to Watch and Future Stars
+   * were never in it. The page says it instead: «Requires Ones to Watch,
+   * Destined for Glory or Future Stars Player Items to complete». The names
+   * are translated into the game's identifiers with the rarities from the
+   * source's data file (`rarita`).
    */
   const rarita = raritaDelRequisito(t);
 
   /*
    * ── UOMINI, DONNE O ENTRAMBI: LO DICE IL REQUISITO ────────────────────────
    *
-   * SEGNALATO il 13/10/2026: nell'album del West Ham FUTMAGO proponeva anche
-   * i giocatori maschili, ma il gioco accetta solo la squadra femminile.
+   * The West Ham album's proposed lineup also listed the men's players,
+   * while the game accepts only the women's team.
    *
    * Le leghe delle carte mostrate (`leghe`) dicono cosa e' USCITO, non cosa
    * l'album accetta. Il requisito invece e' il testo di EA, e lo dice chiaro:
@@ -258,9 +259,9 @@ function leggiSet(htmlIntero, percorso, categoria) {
   /*
    * ── SENZA STEMMA, IL NUMERO LO DICONO LE CARTE ──────────────────────────
    *
-   * TROVATO il 22/10/2026: i 66 album nuovi di Season 2 (MLS, NWSL, ROSHN e
-   * le loro squadre) sono arrivati su fut.gg senza l'immagine dello stemma, e
-   * sono entrati nel catalogo con club 0 e lega 0: FUTMAGO li scarta, perche'
+   * The 66 new albums of Season 2 (MLS, NWSL, ROSHN and their teams) arrived
+   * without the badge image, and entered the catalogue with club 0 and league
+   * 0: they are discarded, because
    * un album che non filtra niente conterrebbe tutte le carte. Le carte della
    * formazione proposta portano `clubEaId` e `leagueEaId`: il piu' frequente
    * e' quello dell'album (Inter Miami: 112893, MLS: 39).
@@ -304,7 +305,7 @@ function genereDelRequisito(t) {
   return null;
 }
 
-/** Nome della rarita' (fut.gg, in minuscolo) -> identificativo EA. Lo riempie `principale`. */
+/** Name of the rarity (from the source, lowercase) -> the game's identifier. It fills `principale`. */
 const RARITA_PER_NOME = new Map();
 
 function raritaDelRequisito(t) {
