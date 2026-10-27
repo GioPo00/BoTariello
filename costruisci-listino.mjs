@@ -138,6 +138,10 @@ for (const [nome, chiave] of Object.entries(PIATTAFORME)) {
   }
   const stati = numeri(fermi['s']).length > 0 ? fermi['s'] : dinamici['s'];
   const { documento, conti } = unisci(indice, dinamici['p'], fermi['p'], stati);
+  /* Il listino porta con se' l'istante in cui e' stato generato: e' l'unico
+     modo che ha il client di sapere quanto sono vecchi i prezzi che sta
+     usando. I parser gia' esistenti ignorano i campi in piu'. */
+  documento.quando = quando;
   writeFileSync(path.join(destinazione, `listino-${nome}.json`), JSON.stringify(documento));
   riepilogo.piattaforme[nome] = conti;
   console.log(
